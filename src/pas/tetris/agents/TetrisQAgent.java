@@ -31,13 +31,16 @@ import edu.bu.tetris.utils.Pair;
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run1.log
 
 // more phases/games
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 20000 -t 400 -v 100 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run3.log
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 20000 -t 400 -v 100 -g 0.99 -n 0.00001 -u 5 -b 500000 -c 1000000000 -s | tee run4.log
 
 // IP address of system
 // ssh jbrin@10.210.1.208
 
 // Command for just running a test game
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent
+
+// Test game in the cs440 environment
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun1.log
 
 
 public class TetrisQAgent
@@ -325,7 +328,7 @@ public class TetrisQAgent
         // Make points scored very important for the reward function
         reward += 1024 * game.getScoreThisTurn();
 
-        System.out.println("Re- " + reward);
+        // System.out.println("Re- " + reward);
         return reward;
     }
 
