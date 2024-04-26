@@ -28,6 +28,13 @@ import edu.bu.tetris.training.data.Dataset;
 import edu.bu.tetris.utils.Coordinate;
 import edu.bu.tetris.utils.Pair;
 
+// java -cp lib/*:. edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run1.log
+
+// more phases/games
+// java -cp lib/*:. edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 20000 -t 400 -v 100 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run3.log
+
+// IP address of system
+// ssh jbrin@10.210.1.208
 
 
 public class TetrisQAgent
@@ -49,16 +56,19 @@ public class TetrisQAgent
     @Override
     public Model initQFunction()
     {
-        // build a single-hidden-layer feedforward network
-        // this example will create a 3-layer neural network (1 hidden layer)
-        // in this example, the input to the neural network is the
-        // image of the board unrolled into a giant vector
+        // builds a neural network with 3 hidden layers
         final int inputSize = 2 * Board.NUM_COLS;
         final int hiddenDim = 4 * Board.NUM_COLS;
         final int outDim = 1;
+        final int numHiddenLayers = 3;
 
         Sequential qFunction = new Sequential();
         qFunction.add(new Dense(inputSize, hiddenDim));
+        // note this loop starts at 1
+        for (int i = 1; i < numHiddenLayers; i++) {
+            qFunction.add(new ReLU());
+            qFunction.add(new Dense(hiddenDim, hiddenDim));
+        }
         qFunction.add(new ReLU());
         qFunction.add(new Dense(hiddenDim, outDim));
 
@@ -88,7 +98,6 @@ public class TetrisQAgent
         Matrix features = null;
         try
         {
-
             arrayImage = game.getGrayscaleImage(potentialAction);
             // System.out.print("\n\n\narray");
             // System.out.print(arrayImage);
@@ -186,6 +195,8 @@ public class TetrisQAgent
     @Override
     public Mino getExplorationMove(final GameView game)
     {
+        // add forced teaching so we select a winning move if it exists
+
         int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
         return game.getFinalMinoPositions().get(randIdx);
     }
@@ -297,9 +308,10 @@ public class TetrisQAgent
                 //     System.out.println("\ntopAir is " + topAir + " and density is " + density);
                 // }
 
+
                 // total reward will be the amount of air above the blocks but give a disadvantage if there's a lower density below the blocks
-                // reward += topAir * Math.pow(Math.E, density);
-                reward += topAir * density;
+                reward += topAir * Math.pow(Math.E, 1 + density);
+                // reward += topAir * density;
             }
 
         } catch(Exception e)
