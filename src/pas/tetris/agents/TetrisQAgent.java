@@ -28,6 +28,9 @@ import edu.bu.tetris.training.data.Dataset;
 import edu.bu.tetris.utils.Coordinate;
 import edu.bu.tetris.utils.Pair;
 
+// COMPILE
+// javac -cp "./lib/*:." @tetris.srcs
+
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run1.log
 
 // more phases/games
@@ -40,7 +43,7 @@ import edu.bu.tetris.utils.Pair;
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent
 
 // Test game in the cs440 environment
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun1.log
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
 
 
 public class TetrisQAgent
@@ -48,6 +51,12 @@ public class TetrisQAgent
 {
 
     public static final double EXPLORATION_PROB = 0.05;
+
+    // phase and game exp are the max prob at the start of each phase/epoch
+    // exp probability is the sum of the 3
+    public static final double PHASE_EXP = 0.045;
+    public static final double GAME_EXP = 0.015;
+    public static final double MIN_EXP = 0.03;
 
     private Random random;
 
@@ -157,6 +166,8 @@ public class TetrisQAgent
                 // }
             }
 
+            // I wanna do something for how filled in the rows are
+
         } catch(Exception e)
         {
             e.printStackTrace();
@@ -186,7 +197,22 @@ public class TetrisQAgent
     public boolean shouldExplore(final GameView game,
                                  final GameCounter gameCounter)
     {
-        return this.getRandom().nextDouble() <= EXPLORATION_PROB;
+        // System.out.println("cur game idx: " + gameCounter.getCurrentGameIdx());
+        // System.out.println("cur phase idx: " + gameCounter.getCurrentPhaseIdx());
+        // System.out.println("tot game count: " + gameCounter.getNumTrainingGames());
+        // System.out.println("phase count: " + gameCounter.getNumPhases());
+
+        // make the exploration rate highest at the start of each phase and 
+        // get the progress of this phase
+        double gameProgress = (double) gameCounter.getCurrentGameIdx() / gameCounter.getNumTrainingGames();
+        double phaseProgress = (double) gameCounter.getCurrentPhaseIdx() / gameCounter.getNumPhases();
+
+        // System.out.println("pP: " + gameProgress + " tP: " + phaseProgress);
+
+        double exp_prob = MIN_EXP + PHASE_EXP * (1-phaseProgress) + GAME_EXP * (1-gameProgress);
+        // System.out.println(exp_prob);
+
+        return this.getRandom().nextDouble() <= exp_prob;
     }
 
     /**
