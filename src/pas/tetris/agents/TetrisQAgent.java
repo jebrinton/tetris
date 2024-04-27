@@ -54,7 +54,7 @@ public class TetrisQAgent
 
     // phase and game exp are the max prob at the start of each phase/epoch
     // exp probability is the sum of the 3
-    public static final double PHASE_EXP = 0.045;
+    public static final double PHASE_EXP = 0.055;
     public static final double GAME_EXP = 0.015;
     public static final double MIN_EXP = 0.03;
 
@@ -72,10 +72,10 @@ public class TetrisQAgent
     public Model initQFunction()
     {
         // builds a neural network with 3 hidden layers
-        final int inputSize = 2 * Board.NUM_COLS;
-        final int hiddenDim = 4 * Board.NUM_COLS;
+        final int inputSize = 4;
+        final int hiddenDim = 32;
         final int outDim = 1;
-        final int numHiddenLayers = 3;
+        final int numHiddenLayers = 2;
 
         Sequential qFunction = new Sequential();
         qFunction.add(new Dense(inputSize, hiddenDim));
@@ -113,13 +113,69 @@ public class TetrisQAgent
         Matrix features = null;
         try
         {
+            // 1.0 is current mino, 0.5 is previous minos, 0.0 is air
             arrayImage = game.getGrayscaleImage(potentialAction);
-            // System.out.print("\n\n\narray");
-            // System.out.print(arrayImage);
-
+            
             int NUM_COLS = arrayImage.getShape().getNumCols();
             int NUM_ROWS = arrayImage.getShape().getNumRows();
 
+            // New plan for features: total height (sum of cols' heights), bumpinesss, trapped air, number of complete rows
+            features = Matrix.zeros(1, 4);
+            int totalHeight = NUM_COLS * NUM_ROWS;
+            int bumpiness = 0;
+            int holes = 0;
+            int completeRows = 0;
+
+            int lastColAir = 0;
+
+            // loop through cols then rows from NW to SE
+            for (int col = 0; col < NUM_COLS; col++) {
+                int row = 0;
+                // initial top air
+                while (row < NUM_ROWS && arrayImage.get(row, col) == 0.0) {
+                    totalHeight--;
+                    row++;
+                }
+
+                // now row is at the index of the first block
+                // increment bumpiness by the absolute difference between the last row height and this row's height
+                if (col > 0) {
+                    bumpiness += Math.abs(lastColAir - row);
+                }
+                lastColAir = row;
+
+                // continue to bottom
+                while (row < NUM_ROWS) {
+                    // count number of holes (air)
+                    if (arrayImage.get(row, col) == 0.0) {
+                        holes++;
+                    }
+                    row++;
+                }
+            }
+
+            // loop thru all rows
+            // if there is a row with no air blocks, increment completeRows
+            for (int row = 0; row < NUM_ROWS; row++) {
+                boolean isFull = true;
+                for (int col = 0; col < NUM_COLS; col++) {
+                    if (arrayImage.get(row, col) == 0.0) {
+                        isFull = false;
+                        break;
+                    }
+                }
+                if (isFull) {
+                    completeRows++;
+                }
+            }
+
+            // add features to matrix
+            features.set(0, 0, totalHeight);
+            features.set(0, 1, bumpiness);
+            features.set(0, 2, holes);
+            features.set(0, 3, completeRows);
+
+            /*
             // create a flattened matrix as output
             // 2 features per column (topAir and density)
             features = Matrix.zeros(1, 2 * NUM_COLS);
@@ -165,8 +221,10 @@ public class TetrisQAgent
                 //     System.out.println("\ntopAir is " + topAir + " and density is " + density);
                 // }
             }
+            */
 
-            // I wanna do something for how filled in the rows are
+            // TO DO: Add how filled in the rows are
+            // And how much the placement will increase the ceiling
 
         } catch(Exception e)
         {
@@ -174,7 +232,7 @@ public class TetrisQAgent
             System.exit(-1);
         }
 
-        // System.out.print(features);
+        System.out.print(features);
         return features;
     }
 
@@ -197,11 +255,6 @@ public class TetrisQAgent
     public boolean shouldExplore(final GameView game,
                                  final GameCounter gameCounter)
     {
-        // System.out.println("cur game idx: " + gameCounter.getCurrentGameIdx());
-        // System.out.println("cur phase idx: " + gameCounter.getCurrentPhaseIdx());
-        // System.out.println("tot game count: " + gameCounter.getNumTrainingGames());
-        // System.out.println("phase count: " + gameCounter.getNumPhases());
-
         // make the exploration rate highest at the start of each phase and 
         // get the progress of this phase
         double gameProgress = (double) gameCounter.getCurrentGameIdx() / gameCounter.getNumTrainingGames();
@@ -227,7 +280,7 @@ public class TetrisQAgent
     @Override
     public Mino getExplorationMove(final GameView game)
     {
-        // add forced teaching so we select a winning move if it exists
+        // add teacher forcing so we select a winning move if it exists
 
         int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
         return game.getFinalMinoPositions().get(randIdx);
