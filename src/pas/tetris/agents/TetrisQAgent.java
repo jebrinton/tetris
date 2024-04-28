@@ -1,11 +1,16 @@
 package src.pas.tetris.agents;
 
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 // SYSTEM IMPORTS
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
-
+import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 // JAVA PROJECT IMPORTS
 import edu.bu.tetris.agents.QAgent;
@@ -67,7 +72,7 @@ public class TetrisQAgent
     // constants used in the reward function to penalize total height, bumpiness, and number of holes
     public static final double HEIGHT_REWARD = -0.21;
     public static final double BUMPINESS_REWARD = -0.10;
-    public static final double HOLES_REWARD = -1.45;
+    public static final double HOLES_REWARD = -0.95;
     public static final double SOLO_ROW_REWARD = -1.77;
 
     private Random random;
@@ -75,7 +80,8 @@ public class TetrisQAgent
     public TetrisQAgent(String name)
     {
         super(name);
-        this.random = new Random(12345); // optional to have a seed
+        // old seed was 12345
+        this.random = new Random(77777); // optional to have a seed
     }
 
     public Random getRandom() { return this.random; }
@@ -271,8 +277,54 @@ public class TetrisQAgent
     public Mino getExplorationMove(final GameView game)
     {
         // add teacher forcing so we select a winning move if it exists
+        
+        /*
+        // iterate thru all final minos in coordinate order
+        // and print qVal
+        List<Mino> originalMinoList = game.getFinalMinoPositions();
+        List<Mino> minoList = new ArrayList<>(originalMinoList);
+        minoList.sort(Comparator.comparing(mino -> mino.getPivotBlockCoordinate().getXCoordinate()));
 
-        int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
+        Iterator<Mino> iterator = minoList.iterator();
+
+        while (iterator.hasNext()) {
+            Mino mino = iterator.next();
+            try {
+                System.out.println("Placing at " + mino.getPivotBlockCoordinate() + " facing " + mino.getOrientation() + " has qVal " + this.getQFunction().forward(getQFunctionInput(game, mino)));
+                TimeUnit.SECONDS.sleep(4);
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        }
+        */
+
+        List<Mino> minosOriginal = game.getFinalMinoPositions();
+        List<Mino> minos = new ArrayList<>(minosOriginal);
+        // tree map for automatic sorting
+        Map<Double, Mino> minoMap = new TreeMap<>();
+        for (Mino mino : minos) {
+            try {
+                minoMap.put(this.getQFunction().forward(getQFunctionInput(game, mino)).item(), mino);
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        }
+
+        int numMinos = minoMap.size();
+        Random random = new Random();
+        // gives a distribution from 0 to inf
+        double randomIndex = (1 / Math.log(random.nextDouble() + 1)) - 1;
+        // note subtracting 1 from numMinos because we don't want the policy mino
+        // add 1 at the front to offset so we have 1/2 chance of selecting 1, 1/4 of 2, etc.
+        int randIdx = 1 + (int) randomIndex % (numMinos - 1);
+
+        // System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
+
+        // base implementation
+        // int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
+
         return game.getFinalMinoPositions().get(randIdx);
     }
 
@@ -362,7 +414,7 @@ public class TetrisQAgent
                 // Make reward very low if we lost the game
                 if (board.isCoordinateOccupied(col, row + 2)) {
                     reward -= 2048;
-                    System.out.println("GAME OVER");
+                    // System.out.println("GAME OVER");
                 }
 
                 // initial top air
@@ -412,7 +464,7 @@ public class TetrisQAgent
                 reward += SOLO_ROW_REWARD;
             }
 
-            System.out.println("RE- " + reward);
+            // System.out.println("RE- " + reward);
 
         } catch(Exception e)
         {
