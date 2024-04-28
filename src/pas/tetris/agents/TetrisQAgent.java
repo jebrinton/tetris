@@ -42,7 +42,11 @@ import edu.bu.tetris.utils.Pair;
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 20000 -t 200 -v 100 -g 0.99 -n 0.00001 -u 4 -b 500000 -c 1000000000 -s | tee run7.log
 
 // Ok using the training rate provided from Piazza
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 500000 -c 1000000000 -s | tee run8.log
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 50000 -c 1000000000 -s | tee run8.log
+
+// Fast training rate which somehow worked well (now I'm realizing it was just the seed honestly) (so I changed it back)
+// Ok now this one is practically the same as the Piazza one it's just with the correct ins and outs
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 500000 -o ./n1params/q -i ./n1params/q1.model --outOffset 900000 -s | tee n1run1.log
 
 // IP address of system
 // ssh jbrin@10.210.1.208
@@ -74,6 +78,9 @@ public class TetrisQAgent
     public static final double BUMPINESS_REWARD = -0.10;
     public static final double HOLES_REWARD = -0.95;
     public static final double SOLO_ROW_REWARD = -1.77;
+    public static final double COMPLETE_ROW_REWARD = 9.0;
+
+    public static final double REWARD_FACTOR = 1;
 
     private Random random;
 
@@ -145,6 +152,7 @@ public class TetrisQAgent
             int completeRows = 0;
 
             // Possible new features: number of type of Mino in the queue (one-hot encoding); number of covers by the specific Mino
+            // number of 1-missing rows
 
             // used to calculate bumpiness
             int lastColAir = 0;
@@ -253,6 +261,8 @@ public class TetrisQAgent
     public boolean shouldExplore(final GameView game,
                                  final GameCounter gameCounter)
     {
+        // return false;
+
         // make the exploration rate highest at the start of each phase and 
         // get the progress of this phase
         double gameProgress = (double) gameCounter.getCurrentGameIdx() / gameCounter.getNumTrainingGames();
@@ -468,7 +478,9 @@ public class TetrisQAgent
             if (completeRows == 1) {
                 reward += SOLO_ROW_REWARD;
             }
-
+            else if (completeRows > 1) {
+                reward += COMPLETE_ROW_REWARD * Math.pow(completeRows, 2);
+            }
             // System.out.println("RE- " + reward);
 
         } catch(Exception e)
@@ -479,6 +491,10 @@ public class TetrisQAgent
 
         // Make points scored very important for the reward function
         reward += 2048 * game.getScoreThisTurn();
+
+        reward = reward * REWARD_FACTOR;
+
+        // System.out.print(reward);
 
         return reward;
     }
