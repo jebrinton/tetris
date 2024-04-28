@@ -64,12 +64,12 @@ import edu.bu.tetris.utils.Pair;
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
 
 
-public class TetrisQAgent
+public class TetrisQAgentSmallNN
     extends QAgent
 {
     // Constants for sizes of neural network (num of features)
     public static final int INPUT_SIZE = 5;
-    public static final int HIDDEN_SIZE = 32;
+    public static final int HIDDEN_SIZE = 8;
 
     public static final double EXPLORATION_PROB = 0.05;
 
@@ -91,7 +91,7 @@ public class TetrisQAgent
 
     private Random random;
 
-    public TetrisQAgent(String name)
+    public TetrisQAgentSmallNN(String name)
     {
         super(name);
         // old seed was 12345
@@ -103,7 +103,6 @@ public class TetrisQAgent
     @Override
     public Model initQFunction()
     {
-        // builds a 32x2 hidden layer neural network
         final int outDim = 1;
         final int numHiddenLayers = 2;
 
