@@ -36,6 +36,9 @@ import edu.bu.tetris.utils.Pair;
 // more phases/games
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 20000 -t 200 -v 100 -g 0.99 -n 0.00001 -u 4 -b 500000 -c 1000000000 -s | tee run7.log
 
+// Ok using the training rate provided from Piazza
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 500000 -c 1000000000 -s | tee run8.log
+
 // IP address of system
 // ssh jbrin@10.210.1.208
 
@@ -49,6 +52,8 @@ import edu.bu.tetris.utils.Pair;
 public class TetrisQAgent
     extends QAgent
 {
+    // Constants for sizes of neural network (num of features)
+    public static final int INPUT_SIZE = 5;
 
     public static final double EXPLORATION_PROB = 0.05;
 
@@ -57,12 +62,13 @@ public class TetrisQAgent
     public static final double PHASE_EXP = 0.055;
     public static final double GAME_EXP = 0.015;
     public static final double MIN_EXP = 0.03;
+    // coincidentally, this will be an exp_prob of 0.05 halfway thru
 
     // constants used in the reward function to penalize total height, bumpiness, and number of holes
-    public static final double HEIGHT_REWARD = -2.1;
-    public static final double BUMPINESS_REWARD = -1.0;
-    public static final double HOLES_REWARD = -14.5;
-    public static final double SOLO_ROW_REWARD = -17.7;
+    public static final double HEIGHT_REWARD = -0.21;
+    public static final double BUMPINESS_REWARD = -0.10;
+    public static final double HOLES_REWARD = -1.45;
+    public static final double SOLO_ROW_REWARD = -1.77;
 
     private Random random;
 
@@ -78,13 +84,12 @@ public class TetrisQAgent
     public Model initQFunction()
     {
         // builds a 32x2 hidden layer neural network
-        final int inputSize = 4;
         final int hiddenDim = 32;
         final int outDim = 1;
         final int numHiddenLayers = 2;
 
         Sequential qFunction = new Sequential();
-        qFunction.add(new Dense(inputSize, hiddenDim));
+        qFunction.add(new Dense(INPUT_SIZE, hiddenDim));
         // note this loop starts at 1
         for (int i = 1; i < numHiddenLayers; i++) {
             qFunction.add(new ReLU());
@@ -125,18 +130,24 @@ public class TetrisQAgent
             int NUM_COLS = arrayImage.getShape().getNumCols();
             int NUM_ROWS = arrayImage.getShape().getNumRows();
 
-            // New plan for features: total height (sum of cols' heights), bumpinesss, trapped air, number of complete rows
-            features = Matrix.zeros(1, 4);
+            // New plan for features: total height (sum of cols' heights), bumpinesss, trapped air, number of covering pieces, number of complete rows
+            features = Matrix.zeros(1, INPUT_SIZE);
             int totalHeight = NUM_COLS * NUM_ROWS;
             int bumpiness = 0;
             int holes = 0;
+            int covers = 0;
             int completeRows = 0;
+
+            // Possible new features: number of type of Mino in the queue (one-hot encoding); number of covers by the specific Mino
 
             // used to calculate bumpiness
             int lastColAir = 0;
 
             // loop through cols then rows from NW to SE
             for (int col = 0; col < NUM_COLS; col++) {
+                // cover total for this column
+                int colCovers = 0;
+
                 int row = 0;
                 // initial top air
                 while (row < NUM_ROWS && arrayImage.get(row, col) == 0.0) {
@@ -151,14 +162,31 @@ public class TetrisQAgent
                 }
                 lastColAir = row;
 
+                // while squares are covered (we're only measuring the top cover)
+                while (row < NUM_ROWS && arrayImage.get(row, col) != 0.0) {
+                    colCovers++;
+                    row++;
+                }
+
+                boolean isTrueCover = false;
+
                 // continue to bottom
                 while (row < NUM_ROWS) {
                     // count number of holes (air)
                     if (arrayImage.get(row, col) == 0.0) {
+                        // check that it actually covers
+                        isTrueCover = true;
                         holes++;
                     }
                     row++;
                 }
+
+                // reset covers
+                if (!isTrueCover) {
+                    colCovers = 0;
+                }
+
+                covers += colCovers;
             }
 
             // loop thru all rows
@@ -180,7 +208,15 @@ public class TetrisQAgent
             features.set(0, 0, totalHeight);
             features.set(0, 1, bumpiness);
             features.set(0, 2, holes);
-            features.set(0, 3, completeRows);
+            features.set(0, 3, covers);
+            features.set(0, 4, completeRows);
+
+            // normalize features
+            Matrix featuresNorm = features.norm(2);
+            features = features.ediv(featuresNorm);
+
+            // System.out.println("TH: " + totalHeight + " Bmp: " + bumpiness + " Hol: " + holes + " Cov: " + covers + " CR: " + completeRows);
+            // System.out.println(features);
 
         } catch(Exception e)
         {
@@ -322,6 +358,13 @@ public class TetrisQAgent
             // loop through cols then rows from NW to SE
             for (int col = 0; col < Board.NUM_COLS; col++) {
                 int row = 0;
+
+                // Make reward very low if we lost the game
+                if (board.isCoordinateOccupied(col, row + 2)) {
+                    reward -= 2048;
+                    System.out.println("GAME OVER");
+                }
+
                 // initial top air
                 while (board.isInBounds(new Coordinate(col, row)) && !board.isCoordinateOccupied(col, row)) {
                     totalHeight--;
@@ -369,53 +412,7 @@ public class TetrisQAgent
                 reward += SOLO_ROW_REWARD;
             }
 
-            // System.out.println("RE- " + reward);
-
-            /*
-            board = game.getBoard();
-            
-            for (int col = 0; col < Board.NUM_COLS; col++) {
-                int topAir = 0;
-                // loop through top air blocks
-                int row = 0;
-                // this is using row is x and col is y
-                while (board.isInBounds(new Coordinate(col, row)) && !board.isCoordinateOccupied(col, row)) {
-                    topAir++;
-                    row++;
-                }
-
-                double density = 1;
-                // increment row and check if we went out of bounds
-                row++;
-                if (!board.isInBounds(new Coordinate(col, row))) {
-                    density = 1;
-                }
-                else {
-                    // loop through remaining blocks
-                    int midAir = 0;
-                    int midBlock = 0;
-                    while (board.isInBounds(new Coordinate(col, row))) {
-                        // air
-                        if (!board.isCoordinateOccupied(col, row)) {
-                            midAir++;
-                        }
-                        else {
-                            midBlock++;
-                        }
-                        row++;
-                    }
-                    density = (double) midBlock / (midAir + midBlock);
-                }
-
-                // if (col == 0) {
-                //     System.out.println("\ntopAir is " + topAir + " and density is " + density);
-                // }
-
-                // total reward will be the amount of air above the blocks but give a disadvantage if there's a lower density below the blocks
-                reward += topAir * Math.pow(Math.E, density - 0.67);
-                // reward += topAir * density;
-            }
-            */
+            System.out.println("RE- " + reward);
 
         } catch(Exception e)
         {
