@@ -300,6 +300,11 @@ public class TetrisQAgent
         */
 
         List<Mino> minosOriginal = game.getFinalMinoPositions();
+
+        // so we don't divide by 0 later
+        if (minosOriginal.size() == 1) {
+            return minosOriginal.get(0);
+        }
         List<Mino> minos = new ArrayList<>(minosOriginal);
         // tree map for automatic sorting
         Map<Double, Mino> minoMap = new TreeMap<>();
@@ -318,7 +323,7 @@ public class TetrisQAgent
         double randomIndex = (1 / Math.log(random.nextDouble() + 1)) - 1;
         // note subtracting 1 from numMinos because we don't want the policy mino
         // add 1 at the front to offset so we have 1/2 chance of selecting 1, 1/4 of 2, etc.
-        int randIdx = 1 + (int) randomIndex % (numMinos - 1);
+        int randIdx = 1 + (int) (randomIndex % (numMinos - 1));
 
         // System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
 
