@@ -54,22 +54,30 @@ import edu.bu.tetris.utils.Pair;
 // Slower training rate but start with a good seed???
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.001 -b 500000 -o ./n-3params/q -i ./n1params/q1.model --outOffset 300000 -s | tee n-3run1.log
 
+// SmallNN one
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.001 -b 500000 -o ./snn-params/q -s | tee snn-run1.log
+
 // Even slower training with u set higher
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.0001 -u 7 -b 500000 -o ./n-4params/q -i ./n1params/q1.model --outOffset 400000 -s | tee n-4run1.log
 
 // Command for just running a test game
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent
 
+// Test game using a certain model
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -i ./snn666.model
+
 // Test game in the cs440 environment
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
 
+// TODO: ensure that buffer is large enough
 
 public class TetrisQAgent
     extends QAgent
 {
     // Constants for sizes of neural network (num of features)
     public static final int INPUT_SIZE = 5;
-    public static final int HIDDEN_SIZE = 32;
+    public static final int HIDDEN_SIZE = 8;
+    public static final int NUM_HIDDEN_LAYERS = 2;
 
     public static final double EXPLORATION_PROB = 0.05;
 
@@ -84,7 +92,7 @@ public class TetrisQAgent
     public static final double HEIGHT_REWARD = -0.21;
     public static final double BUMPINESS_REWARD = -0.10;
     public static final double HOLES_REWARD = -0.95;
-    public static final double SOLO_ROW_REWARD = -1.77;
+    public static final double SOLO_ROW_REWARD = -0.17;
     public static final double COMPLETE_ROW_REWARD = 9.0;
 
     public static final double REWARD_FACTOR = 1;
@@ -103,14 +111,13 @@ public class TetrisQAgent
     @Override
     public Model initQFunction()
     {
-        // builds a 32x2 hidden layer neural network
+        // builds a 16x1 hidden layer neural network
         final int outDim = 1;
-        final int numHiddenLayers = 2;
 
         Sequential qFunction = new Sequential();
         qFunction.add(new Dense(INPUT_SIZE, HIDDEN_SIZE));
         // note this loop starts at 1
-        for (int i = 1; i < numHiddenLayers; i++) {
+        for (int i = 1; i < NUM_HIDDEN_LAYERS; i++) {
             qFunction.add(new ReLU());
             qFunction.add(new Dense(HIDDEN_SIZE, HIDDEN_SIZE));
         }
@@ -159,6 +166,12 @@ public class TetrisQAgent
 
             // Possible new features: number of type of Mino in the queue (one-hot encoding); number of covers by the specific Mino
             // number of 1-missing rows
+            
+            // Another crazy thing we could try: only base it off what the specific mino does
+            // Such as: height relative to mean height of old minos
+            // number of holes created
+            // bumpiness added
+            // rows completed
 
             // used to calculate bumpiness
             int lastColAir = 0;
@@ -224,16 +237,25 @@ public class TetrisQAgent
                 }
             }
 
-            // add features to matrix
-            features.set(0, 0, totalHeight);
-            features.set(0, 1, bumpiness);
-            features.set(0, 2, holes);
-            features.set(0, 3, covers);
-            features.set(0, 4, completeRows);
+            // feature normalization
 
-            // normalize features
-            Matrix featuresNorm = features.norm(2);
-            features = features.ediv(featuresNorm);
+            // max totalHeight could be is 198 (each row can have up to 9)
+            double heightFeature = totalHeight / 198.0;
+            // max (sane) bumpiness is 20 * (3 or 4) ~= 70
+            double bumpinessFeature = bumpiness / 70.0;
+            // max number of holes without trying super hard would be roughly checkerboard
+            double holesFeature = holes / 110.0;
+            // max number of covers... ok this is a little trickier to visualize, I'm honestly just guessing here
+            double coversFeature = covers / 60.0;
+            // max number of complete rows... ah here we go, something that actually makes sense
+            double completeRowsFeature = completeRows / 4.0;
+
+            // add features to matrix
+            features.set(0, 0, heightFeature);
+            features.set(0, 1, bumpinessFeature);
+            features.set(0, 2, holesFeature);
+            features.set(0, 3, coversFeature);
+            features.set(0, 4, completeRowsFeature);
 
             // System.out.println("TH: " + totalHeight + " Bmp: " + bumpiness + " Hol: " + holes + " Cov: " + covers + " CR: " + completeRows);
             // System.out.println(features);
@@ -267,7 +289,7 @@ public class TetrisQAgent
     public boolean shouldExplore(final GameView game,
                                  final GameCounter gameCounter)
     {
-        // return false;
+        // TODO: change exploration function so that it is ALWAYS exploring at the start
 
         // make the exploration rate highest at the start of each phase and 
         // get the progress of this phase
@@ -292,6 +314,10 @@ public class TetrisQAgent
     @Override
     public Mino getExplorationMove(final GameView game)
     {
+        // TODO: change choose exploration function so that it initially chooses "good" moves as deemed by us
+        // Initially during training we should choose the best according to heuristics
+        // Later on take more from what the qFunction determines is good (optional considering the shouldExplore prob is lower)
+
         // add teacher forcing so we select a winning move if it exists
         
         /*
@@ -413,6 +439,8 @@ public class TetrisQAgent
     @Override
     public double getReward(final GameView game)
     {
+        // TODO: push rewards down so that score doesn't need to be multiplied by anything
+
         Board board = null;
         double reward = 0;
 

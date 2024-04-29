@@ -37,31 +37,21 @@ import edu.bu.tetris.utils.Pair;
 // ssh jbrin@10.210.1.208
 
 // COMPILE
-// javac -cp "./lib/*:." @tetris.srcs
+// javac -cp "./lib/*:." @tetrisSmallNN.srcs
 
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run1.log
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgentSmallNN -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 5000 -c 1000000000 -s | tee run1.log
 
 // more phases/games
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 20000 -t 200 -v 100 -g 0.99 -n 0.00001 -u 4 -b 500000 -c 1000000000 -s | tee run7.log
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgentSmallNN -p 20000 -t 200 -v 100 -g 0.99 -n 0.00001 -u 4 -b 500000 -c 1000000000 -s | tee run7.log
 
-// Ok using the training rate provided from Piazza
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 50000 -c 1000000000 -s | tee run8.log
-
-// Fast training rate which somehow worked well (now I'm realizing it was just the seed honestly) (so I changed it back)
-// Ok now this one is practically the same as the Piazza one it's just with the correct ins and outs
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.01 -b 500000 -o ./n1params/q -i ./n1params/q1.model --outOffset 900000 -s | tee n1run1.log
-
-// Slower training rate but start with a good seed???
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.001 -b 500000 -o ./n-3params/q -i ./n1params/q1.model --outOffset 300000 -s | tee n-3run1.log
-
-// Even slower training with u set higher
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 100 -v 50 -g 0.99 -n 0.0001 -u 7 -b 500000 -o ./n-4params/q -i ./n1params/q1.model --outOffset 400000 -s | tee n-4run1.log
+// SmallNN
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgentSmallNN -p 5000 -t 100 -v 50 -g 0.99 -n 0.001 -b 500000 -o ./snn-params/q -s | tee snn-run1.log
 
 // Command for just running a test game
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgentSmallNN
 
 // Test game in the cs440 environment
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgentSmallNN -s | tee testrun2.log
 
 
 public class TetrisQAgentSmallNN
