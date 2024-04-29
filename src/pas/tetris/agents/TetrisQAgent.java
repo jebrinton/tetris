@@ -81,12 +81,7 @@ public class TetrisQAgent
 
     public static final double EXPLORATION_PROB = 0.05;
 
-    // phase and game exp are the max prob at the start of each phase/epoch
-    // exp probability is the sum of the 3
-    public static final double PHASE_EXP = 0.055;
-    public static final double GAME_EXP = 0.015;
-    public static final double MIN_EXP = 0.03;
-    // coincidentally, this will be an exp_prob of 0.05 halfway thru
+    public static final double MIN_EXP = 0.04;
 
     // constants used in the reward function to penalize total height, bumpiness, and number of holes
     public static final double HEIGHT_REWARD = -0.21;
@@ -289,15 +284,13 @@ public class TetrisQAgent
     public boolean shouldExplore(final GameView game,
                                  final GameCounter gameCounter)
     {
-        // TODO: change exploration function so that it is ALWAYS exploring at the start
+        // New function: remaining phase ratio to the 5th power plus a small offset 
+        // (At the start, will explore a ton before going down)
+        double numPhases = gameCounter.getNumPhases();
+        double curPhase = gameCounter.getCurrentPhaseIdx();
 
-        // make the exploration rate highest at the start of each phase and 
-        // get the progress of this phase
-        double gameProgress = (double) gameCounter.getCurrentGameIdx() / gameCounter.getNumTrainingGames();
-        double phaseProgress = (double) gameCounter.getCurrentPhaseIdx() / gameCounter.getNumPhases();
-
-        double exp_prob = MIN_EXP + PHASE_EXP * (1-phaseProgress) + GAME_EXP * (1-gameProgress);
-        // System.out.println(exp_prob);
+        // Note: due to MIN_EXP, will be above 1 for a few phases
+        double exp_prob = Math.pow((numPhases - curPhase) / numPhases, 5) + MIN_EXP;
 
         return this.getRandom().nextDouble() <= exp_prob;
     }
@@ -341,6 +334,7 @@ public class TetrisQAgent
         }
         */
 
+        // Change this to reward function instead of qFunction
         List<Mino> minosOriginal = game.getFinalMinoPositions();
 
         // so we don't divide by 0 later
@@ -352,7 +346,31 @@ public class TetrisQAgent
         Map<Double, Mino> minoMap = new TreeMap<>();
         for (Mino mino : minos) {
             try {
-                minoMap.put(this.getQFunction().forward(getQFunctionInput(game, mino)).item(), mino);
+                // get the reward if we executed this move
+                Board minoBoard = game.getBoard();
+                minoBoard.addMino(mino);
+                // this function only cares about holes, height, etc.
+                double reward = calculateBoardReward(minoBoard);
+
+                // I can't figure out how to detect T-flips yet, but clears yes
+                int completeRows = 0;
+                for (int row = 0; row < Board.NUM_ROWS; row++) {
+                    boolean isFull = true;
+                    for (int col = 0; col < Board.NUM_COLS; col++) {
+                        if (minoBoard.isCoordinateOccupied(col, row)) {
+                            isFull = false;
+                            break;
+                        }
+                    }
+                    if (isFull) {
+                        completeRows++;
+                    }
+                }
+                if (completeRows > 1) {
+                    reward += Math.pow(completeRows, 2);
+                }
+
+                minoMap.put(reward, mino);
             } catch (Exception e) {
                 e.printStackTrace();
                 System.exit(-1);
@@ -362,12 +380,11 @@ public class TetrisQAgent
         int numMinos = minoMap.size();
         Random random = new Random();
         // gives a distribution from 0 to inf
-        double randomIndex = (1 / Math.log(random.nextDouble() + 1)) - 1;
-        // note subtracting 1 from numMinos because we don't want the policy mino
-        // add 1 at the front to offset so we have 1/2 chance of selecting 1, 1/4 of 2, etc.
-        int randIdx = 1 + (int) (randomIndex % (numMinos - 1));
+        double randomIndex = (1 / Math.log(random.nextDouble() + 1));
+        // ...so we use modulo to get a valid index
+        int randIdx = (int) (randomIndex % numMinos);
 
-        // System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
+        System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
 
         // base implementation
         // int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
@@ -446,90 +463,96 @@ public class TetrisQAgent
 
         try {
             board = game.getBoard();
-
-            // New plan for features: total height (sum of cols' heights), bumpinesss, trapped air, number of complete rows
-            int totalHeight = Board.NUM_COLS * Board.NUM_ROWS;
-            int bumpiness = 0;
-            int holes = 0;
-            int completeRows = 0;
-
-            // used to calculate bumpiness
-            int lastColAir = 0;
-
-            // loop through cols then rows from NW to SE
-            for (int col = 0; col < Board.NUM_COLS; col++) {
-                int row = 0;
-
-                // Make reward very low if we lost the game
-                if (board.isCoordinateOccupied(col, row + 2)) {
-                    reward -= 2048;
-                    // System.out.println("GAME OVER");
-                }
-
-                // initial top air
-                while (board.isInBounds(new Coordinate(col, row)) && !board.isCoordinateOccupied(col, row)) {
-                    totalHeight--;
-                    row++;
-                }
-
-                // now row is at the index of the first block
-                // increment bumpiness by the absolute difference between the last row height and this row's height
-                if (col > 0) {
-                    bumpiness += Math.abs(lastColAir - row);
-                }
-                lastColAir = row;
-
-                // continue to bottom
-                while (row < Board.NUM_ROWS) {
-                    // count number of holes (air)
-                    if (!board.isCoordinateOccupied(col, row)) {
-                        holes++;
-                    }
-                    row++;
-                }
-            }
-
-            // loop thru all rows
-            // if there is a row with no air blocks, increment completeRows
-            for (int row = 0; row < Board.NUM_ROWS; row++) {
-                boolean isFull = true;
-                for (int col = 0; col < Board.NUM_COLS; col++) {
-                    if (!board.isCoordinateOccupied(col, row)) {
-                        isFull = false;
-                        break;
-                    }
-                }
-                if (isFull) {
-                    completeRows++;
-                }
-            }
-
-            // System.out.println("TH: " + totalHeight + " Bmp: " + bumpiness + " Hol: " + holes + " CR: " + completeRows);
-
-            reward = HEIGHT_REWARD * totalHeight + BUMPINESS_REWARD * bumpiness + HOLES_REWARD * holes;
-
-            // don't want to reward just clearing a single row
-            if (completeRows == 1) {
-                reward += SOLO_ROW_REWARD;
-            }
-            else if (completeRows > 1) {
-                reward += COMPLETE_ROW_REWARD * Math.pow(completeRows, 2);
-            }
-            // System.out.println("RE- " + reward);
-
+            reward = calculateBoardReward(board);
         } catch(Exception e)
         {
             e.printStackTrace();
             System.exit(-1);
         }
 
-        // Make points scored very important for the reward function
         reward += 2048 * game.getScoreThisTurn();
 
-        reward = reward * REWARD_FACTOR;
+        return reward;
+    }
 
-        // System.out.print(reward);
+    public static double calculateBoardReward(Board board) {
+        if (board == null) {
+            System.out.println("null board, giving reward 0");
+            return 0;
+        }
+        double reward = 0;
 
+        // New plan for features: total height (sum of cols' heights), bumpinesss, trapped air, number of complete rows
+        int totalHeight = Board.NUM_COLS * Board.NUM_ROWS;
+        int bumpiness = 0;
+        int holes = 0;
+        int completeRows = 0;
+
+        // used to calculate bumpiness
+        int lastColAir = 0;
+
+        // loop through cols then rows from NW to SE
+        for (int col = 0; col < Board.NUM_COLS; col++) {
+            int row = 0;
+
+            // Make reward very low if we lost the game
+            if (board.isCoordinateOccupied(col, row + 2)) {
+                reward -= 2048;
+                // System.out.println("GAME OVER");
+            }
+
+            // initial top air
+            while (board.isInBounds(new Coordinate(col, row)) && !board.isCoordinateOccupied(col, row)) {
+                totalHeight--;
+                row++;
+            }
+
+            // now row is at the index of the first block
+            // increment bumpiness by the absolute difference between the last row height and this row's height
+            if (col > 0) {
+                bumpiness += Math.abs(lastColAir - row);
+            }
+            lastColAir = row;
+
+            // continue to bottom
+            while (row < Board.NUM_ROWS) {
+                // count number of holes (air)
+                if (!board.isCoordinateOccupied(col, row)) {
+                    holes++;
+                }
+                row++;
+            }
+        }
+
+        // loop thru all rows
+        // if there is a row with no air blocks, increment completeRows
+        for (int row = 0; row < Board.NUM_ROWS; row++) {
+            boolean isFull = true;
+            for (int col = 0; col < Board.NUM_COLS; col++) {
+                if (!board.isCoordinateOccupied(col, row)) {
+                    isFull = false;
+                    break;
+                }
+            }
+            if (isFull) {
+                completeRows++;
+            }
+        }
+
+        // System.out.println("TH: " + totalHeight + " Bmp: " + bumpiness + " Hol: " + holes + " CR: " + completeRows);
+
+        reward = HEIGHT_REWARD * totalHeight + BUMPINESS_REWARD * bumpiness + HOLES_REWARD * holes;
+
+        // don't want to reward just clearing a single row
+        if (completeRows == 1) {
+            reward += SOLO_ROW_REWARD;
+        }
+        else if (completeRows > 1) {
+            reward += COMPLETE_ROW_REWARD * Math.pow(completeRows, 2);
+        }
+
+        // System.out.println("RE- " + reward);
+        
         return reward;
     }
 
