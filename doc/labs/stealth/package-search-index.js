@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"edu.bu.labs.stealth.agents"},{"l":"edu.bu.labs.stealth.graph"}];updateSearchResults();
