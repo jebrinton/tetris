@@ -1,2 +1,11 @@
-/params/*
-
+.DS_Store
+*.class
+/notas
+/misc
+/hw
+/doc
+/data
+/*.srcs
+!tetris.srcs
+/src/labs
+/src/pas/battleship
