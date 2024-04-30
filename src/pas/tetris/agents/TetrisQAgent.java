@@ -69,6 +69,25 @@ import edu.bu.tetris.utils.Pair;
 // Test game in the cs440 environment
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
 
+// NOTE: on the server params, etc will be stored like hiddenSize-numLayers-learningRatePower ex: 8-2-3-params
+
+// NEW HOPE runs
+// All of these don't have the crazy high clip value
+
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 400 -v 100 -g 0.99 -n 0.001 -b 50000 -o ./8-2-3-params/q -s | tee 8-2-3.log
+
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 200 -v 100 -g 0.99 -n 0.0001 -b 50000 -o ./8-2-4-params/q -s | tee 8-2-4.log
+
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 200 -v 100 -g 0.99 -n 0.000001 -u 5 -b 50000 -o ./8-2-6-params/q -s | tee 8-2-6.log
+
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 400 -v 100 -g 0.99 -c 1000000000 -n 0.001 -b 50000 -o ./16-1-3-params/q -s | tee 16-1-3.log
+
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 800 -v 200 -g 0.99 -c 1000000000 -n 0.0001 -b 50000 -o ./16-1-4-params/q -s | tee 16-1-4.log
+
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 200 -v 80 -g 0.99 -c 1000000000 -n 0.000001 -u 10 -b 50000 -o ./16-1-6-params/q -s | tee 16-1-6.log
+
+
+
 // TODO: ensure that buffer is large enough
 // TODO: fix Features class so it can operate on Boards (or just make Board2Matrix tbh)
 
@@ -77,8 +96,8 @@ public class TetrisQAgent
 {
     // Constants for sizes of neural network (num of features)
     public static final int INPUT_SIZE = 5;
-    public static final int HIDDEN_SIZE = 8;
-    public static final int NUM_HIDDEN_LAYERS = 2;
+    public static final int HIDDEN_SIZE = 16;
+    public static final int NUM_HIDDEN_LAYERS = 1;
 
     public static final double MIN_EXP = 0.04;
 
