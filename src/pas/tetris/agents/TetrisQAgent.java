@@ -173,7 +173,6 @@ public class TetrisQAgent
         qIn.set(0, 3, coversFeature);
         qIn.set(0, 4, completeRowsFeature);
 
-        System.out.print(qIn);
         return qIn;
     }
 
@@ -255,7 +254,8 @@ public class TetrisQAgent
         }
         List<Mino> minos = new ArrayList<>(minosOriginal);
         // tree map for automatic sorting
-        TreeMap<Double, Mino> minoMap = new TreeMap<>();
+        // note that it's in reverse order so we can choose the most positive reward at the end!
+        TreeMap<Double, Mino> minoMap = new TreeMap<>(Comparator.reverseOrder());
         for (Mino mino : minos) {
             try {
                 // get the features of this move
@@ -265,30 +265,29 @@ public class TetrisQAgent
 
                 minoMap.put(reward, mino);
 
-                try {
-                    System.out.println("Mino " + mino.getPivotBlockCoordinate() + mino.getOrientation() + " has reward " + reward);
+                // try {
+                //     // printMove(game.getGrayscaleImage(mino));
+                //     // System.out.println("Reward: " + reward);
 
-                    printMove(game.getGrayscaleImage(mino));
-
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+                //     Thread.sleep(1000);
+                // } catch (InterruptedException e) {
+                //     // TODO Auto-generated catch block
+                //     e.printStackTrace();
+                // }
             } catch (Exception e) {
                 e.printStackTrace();
                 System.exit(-1);
             }
         }
 
-        int numMinos = minoMap.size();
-        Random random = new Random();
-        // gives a distribution from 0 to inf
-        double randomIndex = (1 / Math.log(random.nextDouble() + 1));
-        // ...so we use modulo to get a valid index
-        int randIdx = (int) (randomIndex % numMinos);
+        // int numMinos = minoMap.size();
+        // Random random = new Random();
+        // // gives a distribution from 0 to inf
+        // double randomIndex = (1 / Math.log(random.nextDouble() + 1));
+        // // ...so we use modulo to get a valid index
+        // int randIdx = (int) (randomIndex % numMinos);
 
-        System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
+        // System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
 
         // base implementation
         // int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
