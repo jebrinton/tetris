@@ -89,7 +89,8 @@ import edu.bu.tetris.utils.Pair;
 // Now let's just get crazy, only 5 inner nodes
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 800 -v 200 -g 0.99 -c 1000000000 -n 0.0001 -b 50000 -o ./5-1-4-params/q -s | tee 5-1-4.log
 
-
+// 12x2
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -p 5000 -t 200 -v 80 -g 0.99 -c 1000000000 -n 0.000001 -u 5 -b 50000 -o ./12-2-6-params/q -s | tee 12-2-6.log
 
 // TODO: ensure that buffer is large enough
 // TODO: fix Features class so it can operate on Boards (or just make Board2Matrix tbh)
@@ -99,8 +100,8 @@ public class TetrisQAgent
 {
     // Constants for sizes of neural network (num of features)
     public static final int INPUT_SIZE = 5;
-    public static final int HIDDEN_SIZE = 5;
-    public static final int NUM_HIDDEN_LAYERS = 1;
+    public static final int HIDDEN_SIZE = 12;
+    public static final int NUM_HIDDEN_LAYERS = 2;
 
     public static final double MIN_EXP = 0.04;
 
