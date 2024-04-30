@@ -79,19 +79,19 @@ public class TetrisQAgent
     public static final int HIDDEN_SIZE = 8;
     public static final int NUM_HIDDEN_LAYERS = 2;
 
-    public static final double EXPLORATION_PROB = 0.05;
-
     public static final double MIN_EXP = 0.04;
 
-    // constants used in the reward function to penalize total height, bumpiness, and number of holes
-    public static final double HEIGHT_REWARD = -0.21;
-    public static final double BUMPINESS_REWARD = -0.10;
-    public static final double HOLES_REWARD = -990.95;
-    public static final double COVERS_REWARD = -0.25;
-    public static final double SOLO_ROW_REWARD = -0.17;
-    public static final double COMPLETE_ROW_REWARD = 1.0;
+    // constants used in the reward function to penalize total height, bumpiness, number of holes, covers, and solo rows
 
-    public static final double REWARD_FACTOR = 1;
+    // Some of these are approximated from: https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
+    public static final double HEIGHT_REWARD = -0.0051;
+    public static final double BUMPINESS_REWARD = -0.0018;
+    public static final double HOLES_REWARD = -0.0036;
+    public static final double COVERS_REWARD = -0.0025;
+    public static final double SOLO_ROW_REWARD = -0.0071;
+    // note: this reward is quadratic
+    public static final double COMPLETE_ROW_REWARD = 0.0900;
+    // the holy grail: find a way to locate t-spins
 
     private Random random;
 
@@ -147,7 +147,6 @@ public class TetrisQAgent
         try {
             ftrs = new Features(game.getGrayscaleImage(potentialAction));
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             System.out.print("Error in getting grayscale image for features");
         }
@@ -218,83 +217,30 @@ public class TetrisQAgent
     @Override
     public Mino getExplorationMove(final GameView game)
     {
-        // TODO: change choose exploration function so that it initially chooses "good" moves as deemed by us
-        // Initially during training we should choose the best according to heuristics
-        // Later on take more from what the qFunction determines is good (optional considering the shouldExplore prob is lower)
+        // choose the best move according to our reward function
+        // to get this, we simulate each move/get the corresponding reward
 
-        // add teacher forcing so we select a winning move if it exists
-        
-        /*
-        // iterate thru all final minos in coordinate order
-        // and print qVal
-        List<Mino> originalMinoList = game.getFinalMinoPositions();
-        List<Mino> minoList = new ArrayList<>(originalMinoList);
-        minoList.sort(Comparator.comparing(mino -> mino.getPivotBlockCoordinate().getXCoordinate()));
+        List<Mino> minos = game.getFinalMinoPositions();
 
-        Iterator<Mino> iterator = minoList.iterator();
-
-        while (iterator.hasNext()) {
-            Mino mino = iterator.next();
-            try {
-                System.out.println("Placing at " + mino.getPivotBlockCoordinate() + " facing " + mino.getOrientation() + " has qVal " + this.getQFunction().forward(getQFunctionInput(game, mino)));
-                TimeUnit.SECONDS.sleep(4);
-            } catch (Exception e) {
-                e.printStackTrace();
-                System.exit(-1);
-            }
-        }
-        */
-
-        // Change this to reward function instead of qFunction
-        List<Mino> minosOriginal = game.getFinalMinoPositions();
-
-        // so we don't divide by 0 later
-        if (minosOriginal.size() == 1) {
-            return minosOriginal.get(0);
-        }
-        List<Mino> minos = new ArrayList<>(minosOriginal);
         // tree map for automatic sorting
         // note that it's in reverse order so we can choose the most positive reward at the end!
         TreeMap<Double, Mino> minoMap = new TreeMap<>(Comparator.reverseOrder());
         for (Mino mino : minos) {
             try {
-                // get the features of this move
+                // get the features of this move and its reward
                 Features features = new Features(game.getGrayscaleImage(mino));
 
-                double reward = features.calculateReward();
-
-                minoMap.put(reward, mino);
-
-                // try {
-                //     // printMove(game.getGrayscaleImage(mino));
-                //     // System.out.println("Reward: " + reward);
-
-                //     Thread.sleep(1000);
-                // } catch (InterruptedException e) {
-                //     // TODO Auto-generated catch block
-                //     e.printStackTrace();
-                // }
+                // add a small fluctuation so we don't always choose the latest of same reward moves
+                minoMap.put(features.calculateReward() + (random.nextDouble() / 100_000), mino);
             } catch (Exception e) {
                 e.printStackTrace();
                 System.exit(-1);
             }
         }
 
-        // int numMinos = minoMap.size();
-        // Random random = new Random();
-        // // gives a distribution from 0 to inf
-        // double randomIndex = (1 / Math.log(random.nextDouble() + 1));
-        // // ...so we use modulo to get a valid index
-        // int randIdx = (int) (randomIndex % numMinos);
-
-        // System.out.println("randIdx is: " + randIdx + " out of " + numMinos);
-
-        // base implementation
-        // int randIdx = this.getRandom().nextInt(game.getFinalMinoPositions().size());
+        // TODO: maybe add stochasticity so we don't always choose the best move
 
         // return best move
-        Mino myMino = minoMap.get(minoMap.firstKey());
-
         return minoMap.get(minoMap.firstKey());
     }
 
@@ -376,7 +322,7 @@ public class TetrisQAgent
             System.exit(-1);
         }
 
-        reward += 2048 * game.getScoreThisTurn();
+        reward += game.getScoreThisTurn();
 
         return reward;
     }
@@ -463,6 +409,9 @@ public class TetrisQAgent
     }
 
     class Features {
+        // TODO: add maxTrough (depth of trough created which an I-tetronimo could fit into)
+        // add t-flip!
+        // add the weighted height; i.e. the square root of the squares of the heights (euclidean??)
         int totalHeight;
         int bumpiness;
         int holes;
