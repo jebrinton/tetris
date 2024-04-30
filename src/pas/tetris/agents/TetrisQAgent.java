@@ -70,6 +70,7 @@ import edu.bu.tetris.utils.Pair;
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
 
 // TODO: ensure that buffer is large enough
+// TODO: fix Features class so it can operate on Boards (or just make Board2Matrix tbh)
 
 public class TetrisQAgent
     extends QAgent
@@ -84,13 +85,13 @@ public class TetrisQAgent
     // constants used in the reward function to penalize total height, bumpiness, number of holes, covers, and solo rows
 
     // Some of these are approximated from: https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
-    public static final double HEIGHT_REWARD = -0.0051;
-    public static final double BUMPINESS_REWARD = -0.0018;
-    public static final double HOLES_REWARD = -0.0036;
-    public static final double COVERS_REWARD = -0.0025;
-    public static final double SOLO_ROW_REWARD = -0.0071;
+    public static final double HEIGHT_REWARD = -0.00051;
+    public static final double BUMPINESS_REWARD = -0.00018;
+    public static final double HOLES_REWARD = -0.00036;
+    public static final double COVERS_REWARD = -0.00015;
+    public static final double SOLO_ROW_REWARD = -0.00071;
     // note: this reward is quadratic
-    public static final double COMPLETE_ROW_REWARD = 0.0900;
+    public static final double COMPLETE_ROW_REWARD = 0.00900;
     // the holy grail: find a way to locate t-spins
 
     private Random random;
@@ -412,6 +413,7 @@ public class TetrisQAgent
         // TODO: add maxTrough (depth of trough created which an I-tetronimo could fit into)
         // add t-flip!
         // add the weighted height; i.e. the square root of the squares of the heights (euclidean??)
+        // also update covers so it is more of covering-a-place-we-could-have-scored metric (this could be epic)
         int totalHeight;
         int bumpiness;
         int holes;
