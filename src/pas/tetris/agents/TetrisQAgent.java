@@ -141,8 +141,17 @@ public class TetrisQAgent
     public Matrix getQFunctionInput(final GameView game,
                                     final Mino potentialAction)
     {
+        Features ftrs = null;
+        try {
+            ftrs = new Features(game.getGrayscaleImage(potentialAction));
+            System.out.println(ftrs);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
         Matrix arrayImage = null;
-        Matrix features = null;
+        Matrix qIn = null;
         try
         {
             // 1.0 is current mino, 0.5 is previous minos, 0.0 is air
@@ -152,7 +161,8 @@ public class TetrisQAgent
             int NUM_ROWS = arrayImage.getShape().getNumRows();
 
             // New plan for features: total height (sum of cols' heights), bumpinesss, trapped air, number of covering pieces, number of complete rows
-            features = Matrix.zeros(1, INPUT_SIZE);
+            qIn = Matrix.zeros(1, INPUT_SIZE);
+
             int totalHeight = NUM_COLS * NUM_ROWS;
             int bumpiness = 0;
             int holes = 0;
@@ -246,13 +256,13 @@ public class TetrisQAgent
             double completeRowsFeature = completeRows / 4.0;
 
             // add features to matrix
-            features.set(0, 0, heightFeature);
-            features.set(0, 1, bumpinessFeature);
-            features.set(0, 2, holesFeature);
-            features.set(0, 3, coversFeature);
-            features.set(0, 4, completeRowsFeature);
+            qIn.set(0, 0, heightFeature);
+            qIn.set(0, 1, bumpinessFeature);
+            qIn.set(0, 2, holesFeature);
+            qIn.set(0, 3, coversFeature);
+            qIn.set(0, 4, completeRowsFeature);
 
-            // System.out.println("TH: " + totalHeight + " Bmp: " + bumpiness + " Hol: " + holes + " Cov: " + covers + " CR: " + completeRows);
+            System.out.println("from original: TH: " + totalHeight + " Bmp: " + bumpiness + " Hol: " + holes + " Cov: " + covers + " CR: " + completeRows);
             // System.out.println(features);
 
         } catch(Exception e)
@@ -262,7 +272,7 @@ public class TetrisQAgent
         }
 
         // System.out.print(features);
-        return features;
+        return qIn;
     }
 
     /**
@@ -348,7 +358,10 @@ public class TetrisQAgent
             try {
                 // get the reward if we executed this move
                 Board minoBoard = game.getBoard();
-                minoBoard.addMino(mino);
+
+                // nvm I don't think addMino works that way
+
+                // minoBoard.addMino(mino);
                 // this function only cares about holes, height, etc.
                 double reward = calculateBoardReward(minoBoard);
 
@@ -556,4 +569,134 @@ public class TetrisQAgent
         return reward;
     }
 
+    class Features {
+        int totalHeight;
+        int bumpiness;
+        int holes;
+        int covers;
+        int completeRows;
+
+        public Features(Matrix arrayImage) {
+            int NUM_COLS = arrayImage.getShape().getNumCols();
+            int NUM_ROWS = arrayImage.getShape().getNumRows();
+
+            System.out.println("Test of inner class success");
+            int totalHeight = NUM_COLS * NUM_ROWS;
+            int bumpiness = 0;
+            int holes = 0;
+            int covers = 0;
+            int completeRows = 0;
+
+            // Possible new features: number of type of Mino in the queue (one-hot encoding); number of covers by the specific Mino
+            // number of 1-missing rows
+            
+            // Another crazy thing we could try: only base it off what the specific mino does
+            // Such as: height relative to mean height of old minos
+            // number of holes created
+            // bumpiness added
+            // rows completed
+
+            // used to calculate bumpiness
+            int lastColAir = 0;
+
+            // loop through cols then rows from NW to SE
+            for (int col = 0; col < NUM_COLS; col++) {
+                // cover total for this column
+                int colCovers = 0;
+
+                int row = 0;
+                // initial top air
+                while (row < NUM_ROWS && arrayImage.get(row, col) == 0.0) {
+                    totalHeight--;
+                    row++;
+                }
+
+                // now row is at the index of the first block
+                // increment bumpiness by the absolute difference between the last row height and this row's height
+                if (col > 0) {
+                    bumpiness += Math.abs(lastColAir - row);
+                }
+                lastColAir = row;
+
+                // while squares are covered (we're only measuring the top cover)
+                while (row < NUM_ROWS && arrayImage.get(row, col) != 0.0) {
+                    colCovers++;
+                    row++;
+                }
+
+                boolean isTrueCover = false;
+
+                // continue to bottom
+                while (row < NUM_ROWS) {
+                    // count number of holes (air)
+                    if (arrayImage.get(row, col) == 0.0) {
+                        // check that it actually covers
+                        isTrueCover = true;
+                        holes++;
+                    }
+                    row++;
+                }
+
+                // reset covers
+                if (!isTrueCover) {
+                    colCovers = 0;
+                }
+
+                covers += colCovers;
+            }
+
+            // loop thru all rows
+            // if there is a row with no air blocks, increment completeRows
+            for (int row = 0; row < NUM_ROWS; row++) {
+                boolean isFull = true;
+                for (int col = 0; col < NUM_COLS; col++) {
+                    if (arrayImage.get(row, col) == 0.0) {
+                        isFull = false;
+                        break;
+                    }
+                }
+                if (isFull) {
+                    completeRows++;
+                }
+            }
+
+            this.totalHeight = totalHeight;
+            this.bumpiness = bumpiness;
+            this.holes = holes;
+            this.covers = covers;
+            this.completeRows = completeRows;
+        }
+
+        @Override
+        public String toString() {
+            return "tHeight: " + totalHeight + " bump: " + bumpiness +
+            " holes: " + holes + " covers: " +
+            covers + " compRows: " + completeRows;
+        }
+
+        // Getter for totalHeight
+        public int getTotalHeight() {
+            return totalHeight;
+        }
+
+        // Getter for bumpiness
+        public int getBumpiness() {
+            return bumpiness;
+        }
+
+        // Getter for holes
+        public int getHoles() {
+            return holes;
+        }
+
+        // Getter for covers
+        public int getCovers() {
+            return covers;
+        }
+
+        // Getter for completeRows
+        public int getCompleteRows() {
+            return completeRows;
+        }
+    }
 }
