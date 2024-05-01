@@ -64,7 +64,7 @@ import edu.bu.tetris.utils.Pair;
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent
 
 // Test game using a certain model
-// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -i ./snn666.model
+// java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -i ./8-2-3-good.model
 
 // Test game in the cs440 environment
 // java -cp "lib/*:." edu.bu.tetris.Main -q src.pas.tetris.agents.TetrisQAgent -s | tee testrun2.log
@@ -97,27 +97,39 @@ import edu.bu.tetris.utils.Pair;
 
 // TODO: ensure that buffer is large enough
 // TODO: fix Features class so it can operate on Boards (or just make Board2Matrix tbh)
+// TODO: add perfect clear/Tetris/T-spin
+
+// Perfect clear is 6pts and is when you completely clear the board. Always go for this
+// Tetris is just clearing 4 lines; 4 pts
+// So basically score is 2^(numLines - 2)
+// Clear 2 lines - 1 pt
+// Clear 3 lines - 2 pts
+// Clear 4 lines - 4 pts
 
 public class TetrisQAgent
     extends QAgent
 {
     // Constants for sizes of neural network (num of features)
-    public static final int INPUT_SIZE = 5;
-    public static final int HIDDEN_SIZE = 12;
-    public static final int NUM_HIDDEN_LAYERS = 1;
+    public static final int INPUT_SIZE = 7;
+    public static final int HIDDEN_SIZE = 7;
+    public static final int NUM_HIDDEN_LAYERS = 2;
 
     public static final double MIN_EXP = 0.04;
 
     // constants used in the reward function to penalize total height, bumpiness, number of holes, covers, and solo rows
 
-    // Some of these are approximated from: https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
-    public static final double HEIGHT_REWARD = -0.00051;
+    // Some (actually not anymore but it was inspiration) of these are approximated from: https://codemyroad.wordpress.com/2013/04/14/tetris-ai-the-near-perfect-player/
+    public static final double HEIGHT_REWARD = -0.00005;
+    public static final double MAX_HEIGHT_REWARD = -0.00019;
     public static final double BUMPINESS_REWARD = -0.00018;
     public static final double HOLES_REWARD = -0.00036;
-    public static final double COVERS_REWARD = -0.00015;
-    public static final double SOLO_ROW_REWARD = -0.00071;
+    public static final double COVERS_REWARD = -0.00027;
+    // this is changed to 0 b/c the scoring changed
+    public static final double SOLO_ROW_REWARD = -0.00000;
     // note: this reward is quadratic
-    public static final double COMPLETE_ROW_REWARD = 0.00900;
+    public static final double COMPLETE_ROW_REWARD = 0.20000;
+    public static final double PERFECT_CLEAR_REWARD = 6.00000;
+    public static final double LOSE_REWARD = -999.0;
     // the holy grail: find a way to locate t-spins
 
     private Random random;
@@ -134,7 +146,6 @@ public class TetrisQAgent
     @Override
     public Model initQFunction()
     {
-        // builds a 16x1 hidden layer neural network
         final int outDim = 1;
 
         Sequential qFunction = new Sequential();
@@ -182,6 +193,7 @@ public class TetrisQAgent
 
         // max totalHeight could be is 198 (each row can have up to 9)
         double heightFeature = ftrs.getTotalHeight() / 198.0;
+        double maxHeightFeature = ftrs.getMaxHeight() / 22.0;
         // max (sane) bumpiness is 20 * (3 or 4) ~= 70
         double bumpinessFeature = ftrs.getBumpiness() / 70.0;
         // max number of holes without trying super hard would be roughly checkerboard
@@ -190,14 +202,17 @@ public class TetrisQAgent
         double coversFeature = ftrs.getCovers() / 60.0;
         // max number of complete rows... ah here we go, something that actually makes sense
         double completeRowsFeature = ftrs.getCompleteRows() / 4.0;
+        double perfectClearFeature = (double) ftrs.getPerfectClear();
 
         // load qInput
         Matrix qIn = Matrix.zeros(1, INPUT_SIZE);
         qIn.set(0, 0, heightFeature);
-        qIn.set(0, 1, bumpinessFeature);
-        qIn.set(0, 2, holesFeature);
-        qIn.set(0, 3, coversFeature);
-        qIn.set(0, 4, completeRowsFeature);
+        qIn.set(0, 1, maxHeightFeature);
+        qIn.set(0, 2, bumpinessFeature);
+        qIn.set(0, 3, holesFeature);
+        qIn.set(0, 4, coversFeature);
+        qIn.set(0, 5, completeRowsFeature);
+        qIn.set(0, 6, perfectClearFeature);
 
         return qIn;
     }
@@ -256,6 +271,8 @@ public class TetrisQAgent
             try {
                 // get the features of this move and its reward
                 Features features = new Features(game.getGrayscaleImage(mino));
+                // printMove(game.getGrayscaleImage(mino));
+                // System.out.println(features);
 
                 // add a small fluctuation so we don't always choose the latest of same reward moves
                 minoMap.put(features.calculateReward() + (random.nextDouble() / 100_000), mino);
@@ -335,8 +352,6 @@ public class TetrisQAgent
     @Override
     public double getReward(final GameView game)
     {
-        // TODO: push rewards down so that score doesn't need to be multiplied by anything
-
         Board board = null;
         double reward = 0;
 
@@ -441,10 +456,12 @@ public class TetrisQAgent
         // add the weighted height; i.e. the square root of the squares of the heights (euclidean??)
         // also update covers so it is more of covering-a-place-we-could-have-scored metric (this could be epic)
         int totalHeight;
+        int maxHeight;
         int bumpiness;
         int holes;
         int covers;
         int completeRows;
+        int perfectClear;
 
         /*
          * Constructor given the 2D grayscale array
@@ -453,7 +470,8 @@ public class TetrisQAgent
             int NUM_COLS = arrayImage.getShape().getNumCols();
             int NUM_ROWS = arrayImage.getShape().getNumRows();
 
-            int totalHeight = NUM_COLS * NUM_ROWS;
+            int totalHeight = 0;
+            int maxHeight = 0;
             int bumpiness = 0;
             int holes = 0;
             int covers = 0;
@@ -479,9 +497,10 @@ public class TetrisQAgent
                 int row = 0;
                 // initial top air
                 while (row < NUM_ROWS && arrayImage.get(row, col) == 0.0) {
-                    totalHeight--;
                     row++;
                 }
+
+                int colHeight = NUM_ROWS - row;
 
                 // now row is at the index of the first block
                 // increment bumpiness by the absolute difference between the last row height and this row's height
@@ -514,7 +533,9 @@ public class TetrisQAgent
                     colCovers = 0;
                 }
 
+                totalHeight += colHeight;
                 covers += colCovers;
+                maxHeight = Math.max(maxHeight, colHeight);
             }
 
             // loop thru all rows
@@ -532,15 +553,30 @@ public class TetrisQAgent
                 }
             }
 
+            int perfectClear = 0;
+            if (completeRows == maxHeight) {
+                perfectClear = 1;
+            }
+
             this.totalHeight = totalHeight;
+            this.maxHeight = maxHeight;
             this.bumpiness = bumpiness;
             this.holes = holes;
             this.covers = covers;
             this.completeRows = completeRows;
+            this.perfectClear = perfectClear;
         }
 
         public double calculateReward() {
             double reward = 0;
+
+            if (maxHeight > 20) {
+                return LOSE_REWARD;
+            }
+
+            if (perfectClear == 1) {
+                return PERFECT_CLEAR_REWARD;
+            }
 
             // ensure to not reward a single row clear
             if (completeRows == 1) {
@@ -551,21 +587,26 @@ public class TetrisQAgent
             }
 
             // linear combination of the rest of the rewards
-            reward += HEIGHT_REWARD * totalHeight + BUMPINESS_REWARD * bumpiness + HOLES_REWARD * holes + COVERS_REWARD * covers;
+            reward += HEIGHT_REWARD * totalHeight + MAX_HEIGHT_REWARD * maxHeight + BUMPINESS_REWARD * bumpiness + HOLES_REWARD * holes + COVERS_REWARD * covers;
             
             return reward;
         }
 
         @Override
         public String toString() {
-            return "tHeight: " + totalHeight + " bump: " + bumpiness +
+            return "tHeight: " + totalHeight + " maxH: " + maxHeight + " bump: " + bumpiness +
             " holes: " + holes + " covers: " +
-            covers + " compRows: " + completeRows;
+            covers + " compRows: " + completeRows + " perfClear: " + perfectClear;
         }
 
         // Getter for totalHeight
         public int getTotalHeight() {
             return totalHeight;
+        }
+
+        // Getter for maxHeight
+        public int getMaxHeight() {
+            return maxHeight;
         }
 
         // Getter for bumpiness
@@ -586,6 +627,11 @@ public class TetrisQAgent
         // Getter for completeRows
         public int getCompleteRows() {
             return completeRows;
+        }
+
+        // Getter for completeRows
+        public int getPerfectClear() {
+            return perfectClear;
         }
     }
 
