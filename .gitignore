@@ -5,6 +5,7 @@
 /hw
 /doc
 /data
+/params
 /*.srcs
 !tetris.srcs
 /src/labs
