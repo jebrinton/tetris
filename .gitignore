@@ -9,3 +9,9 @@
 !tetris.srcs
 /src/labs
 /src/pas/battleship
+/n-4params
+/n1params
+/saves
+BayesianAgent.java
+exploration_function.ggb
+*.sh
