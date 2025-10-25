@@ -5,6 +5,7 @@ This is a reinforcement learning agent that learns to play tetris. Feature engin
 In the end, after an extensive hyperparameter search and (light) abuse of server resources, the final run placed 2nd in Boston University's CS440's final project tournament, out of an enrollment of over 150.
 
 Here's the learning curve. I can't express how excited I was to finally see the agent learn something after sorting through hundreds (ok dozens) of plots similar to this that just looked like flat noise.
+
 ![Learning Curve](img/lc-8-2-3.png)
 
 ## Details
